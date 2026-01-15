@@ -89,20 +89,36 @@
   <!-- JavaScript -->
   <script type="module" src="js/app.js"></script>
 
-  <!-- Remove initial loader when app is ready -->
+  <!-- Error handler and loader removal -->
   <script>
+    // Handle module loading errors
+    window.onerror = function(msg, url, line, col, error) {
+      console.error('Error:', msg, url, line);
+      var app = document.getElementById('app');
+      if (app && !app.innerHTML.trim()) {
+        app.innerHTML = '<div style="padding:40px;text-align:center;color:#fff;"><h1 style="color:#c8ff00;">Erreur</h1><p style="margin-top:16px;color:#888;">'+msg+'</p></div>';
+      }
+      removeLoader();
+      return false;
+    };
+
+    // Remove initial loader
+    function removeLoader() {
+      var loader = document.getElementById('initialLoader');
+      if (loader) {
+        loader.style.opacity = '0';
+        loader.style.transition = 'opacity 0.3s ease';
+        setTimeout(function() { loader.remove(); }, 300);
+      }
+    }
+
+    // Remove loader when page is loaded
     window.addEventListener('load', function() {
-      setTimeout(function() {
-        var loader = document.getElementById('initialLoader');
-        if (loader) {
-          loader.style.opacity = '0';
-          loader.style.transition = 'opacity 0.3s ease';
-          setTimeout(function() {
-            loader.remove();
-          }, 300);
-        }
-      }, 500);
+      setTimeout(removeLoader, 300);
     });
+
+    // Fallback: remove loader after 3 seconds
+    setTimeout(removeLoader, 3000);
   </script>
 
   <!-- Noscript fallback -->

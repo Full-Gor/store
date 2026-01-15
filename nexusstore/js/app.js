@@ -223,16 +223,34 @@ window.renderApp = function() {
 export { renderPage };
 
 // Application startup
-document.addEventListener('DOMContentLoaded', () => {
-  // Restore user session
-  restoreSession();
+function init() {
+  try {
+    // Restore user session
+    restoreSession();
 
-  // Initialize router
-  initRouter();
+    // Initialize router
+    initRouter();
 
-  // Initial render
-  window.renderApp();
+    // Initial render
+    window.renderApp();
 
-  // Log startup
-  console.log('NexusStore initialized');
-});
+    // Log startup
+    console.log('NexusStore initialized');
+  } catch (error) {
+    console.error('Error initializing app:', error);
+    document.getElementById('app').innerHTML = `
+      <div style="padding: 40px; text-align: center; color: #fff;">
+        <h1 style="color: #c8ff00; margin-bottom: 16px;">Erreur</h1>
+        <p>Une erreur s'est produite lors du chargement de l'application.</p>
+        <p style="margin-top: 8px; color: #888;">${error.message}</p>
+      </div>
+    `;
+  }
+}
+
+// Handle both cases: DOM already loaded or still loading
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
