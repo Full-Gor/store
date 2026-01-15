@@ -1,5 +1,6 @@
-// API Configuration
-const API_BASE = '/api';
+// API Configuration - NexusServ Backend
+const API_BASE = 'https://nexuserv.duckdns.org/api';
+const APPS_KEY = 'store_apps';
 
 // Helper function for API calls
 async function fetchAPI(endpoint, options = {}) {
@@ -22,7 +23,6 @@ async function fetchAPI(endpoint, options = {}) {
       throw new Error(error.message || `Erreur ${response.status}`);
     }
 
-    // Handle empty responses
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {
@@ -33,24 +33,26 @@ async function fetchAPI(endpoint, options = {}) {
 
 // ============= AUTH API =============
 
-export async function login(email, password) {
+export async function login(userId, password) {
   const data = await fetchAPI('/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ email, password })
+    body: JSON.stringify({ userId, password })
   });
   if (data.token) {
     localStorage.setItem('nexusstore_token', data.token);
+    localStorage.setItem('nexusstore_user', JSON.stringify({ userId, role: 'admin' }));
   }
   return data;
 }
 
-export async function register(name, email, password, role = 'developer') {
+export async function register(userId, password) {
   const data = await fetchAPI('/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ name, email, password, role })
+    body: JSON.stringify({ userId, password })
   });
   if (data.token) {
     localStorage.setItem('nexusstore_token', data.token);
+    localStorage.setItem('nexusstore_user', JSON.stringify({ userId, role: 'admin' }));
   }
   return data;
 }
@@ -60,65 +62,175 @@ export function logout() {
   localStorage.removeItem('nexusstore_user');
 }
 
-export async function getCurrentUser() {
-  return fetchAPI('/auth/me');
+export function isAuthenticated() {
+  return !!localStorage.getItem('nexusstore_token');
 }
 
-// ============= APPS API =============
-
-export async function getApps(params = {}) {
-  const query = new URLSearchParams(params).toString();
-  return fetchAPI(`/apps${query ? `?${query}` : ''}`);
+export function getCurrentUser() {
+  const user = localStorage.getItem('nexusstore_user');
+  return user ? JSON.parse(user) : null;
 }
 
-export async function getApp(idOrSlug) {
-  return fetchAPI(`/apps/${idOrSlug}`);
+// ============= APPS API (Key-Value Store) =============
+
+// Get all apps from the store
+export async function getApps() {
+  try {
+    const response = await fetch(`${API_BASE}/data/${APPS_KEY}`, {
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return { apps: [] };
+      }
+      throw new Error('Failed to fetch apps');
+    }
+
+    const data = await response.json();
+    const apps = data.value ? JSON.parse(data.value) : [];
+    return { apps };
+  } catch (error) {
+    console.error('Error fetching apps:', error);
+    return { apps: [] };
+  }
 }
 
+// Get single app by ID
+export async function getApp(id) {
+  const { apps } = await getApps();
+  return apps.find(app => app.id === id || app.id === parseInt(id));
+}
+
+// Get featured/hot apps
 export async function getFeaturedApps() {
-  return fetchAPI('/apps/featured');
+  const { apps } = await getApps();
+  return { apps: apps.filter(app => app.featured || app.isHot) };
 }
 
-export async function getCategories() {
-  return fetchAPI('/apps/categories');
+// Save all apps (internal helper)
+async function saveApps(apps) {
+  const token = localStorage.getItem('nexusstore_token');
+  if (!token) throw new Error('Non authentifié');
+
+  // Check if apps key exists
+  const existsResponse = await fetch(`${API_BASE}/data/${APPS_KEY}`, {
+    headers: { 'Content-Type': 'application/json' }
+  });
+
+  const method = existsResponse.ok ? 'PUT' : 'POST';
+  const endpoint = existsResponse.ok ? `/data/${APPS_KEY}` : '/data';
+
+  const body = existsResponse.ok
+    ? { value: JSON.stringify(apps) }
+    : { key: APPS_KEY, value: JSON.stringify(apps) };
+
+  const response = await fetch(`${API_BASE}${endpoint}`, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to save apps');
+  }
+
+  return response.json();
 }
 
+// Create new app
 export async function createApp(appData) {
-  return fetchAPI('/apps', {
-    method: 'POST',
-    body: JSON.stringify(appData)
-  });
+  const { apps } = await getApps();
+
+  const newApp = {
+    id: Date.now(),
+    ...appData,
+    downloads: 0,
+    rating: 0,
+    createdAt: new Date().toISOString()
+  };
+
+  apps.push(newApp);
+  await saveApps(apps);
+
+  return newApp;
 }
 
+// Update existing app
 export async function updateApp(id, appData) {
-  return fetchAPI(`/apps/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(appData)
-  });
+  const { apps } = await getApps();
+  const index = apps.findIndex(app => app.id === id || app.id === parseInt(id));
+
+  if (index === -1) {
+    throw new Error('App not found');
+  }
+
+  apps[index] = { ...apps[index], ...appData, updatedAt: new Date().toISOString() };
+  await saveApps(apps);
+
+  return apps[index];
 }
 
+// Delete app
 export async function deleteApp(id) {
-  return fetchAPI(`/apps/${id}`, {
-    method: 'DELETE'
-  });
+  const { apps } = await getApps();
+  const filtered = apps.filter(app => app.id !== id && app.id !== parseInt(id));
+
+  if (filtered.length === apps.length) {
+    throw new Error('App not found');
+  }
+
+  await saveApps(filtered);
+  return { success: true };
 }
 
-// ============= DEVELOPER API =============
+// Increment download count
+export async function incrementDownloads(id) {
+  const { apps } = await getApps();
+  const index = apps.findIndex(app => app.id === id || app.id === parseInt(id));
 
-export async function getDeveloperStats() {
-  return fetchAPI('/apps/developer/stats');
-}
-
-export async function getDeveloperApps() {
-  return fetchAPI('/apps/developer/apps');
+  if (index !== -1) {
+    apps[index].downloads = (apps[index].downloads || 0) + 1;
+    await saveApps(apps);
+  }
 }
 
 // ============= UPLOAD API =============
 
-export async function uploadAppFile(appId, file, onProgress) {
+// Upload app icon/screenshot (image)
+export async function uploadImage(file) {
   const token = localStorage.getItem('nexusstore_token');
+  if (!token) throw new Error('Non authentifié');
+
   const formData = new FormData();
-  formData.append('app', file);
+  formData.append('file', file);
+
+  const response = await fetch(`${API_BASE}/upload/image`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`
+    },
+    body: formData
+  });
+
+  if (!response.ok) {
+    throw new Error('Image upload failed');
+  }
+
+  const data = await response.json();
+  return data.url || `https://nexuserv.duckdns.org${data.path}`;
+}
+
+// Upload APK file
+export async function uploadFile(file, onProgress) {
+  const token = localStorage.getItem('nexusstore_token');
+  if (!token) throw new Error('Non authentifié');
+
+  const formData = new FormData();
+  formData.append('file', file);
 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -132,7 +244,8 @@ export async function uploadAppFile(appId, file, onProgress) {
 
     xhr.addEventListener('load', () => {
       if (xhr.status >= 200 && xhr.status < 300) {
-        resolve(JSON.parse(xhr.responseText));
+        const data = JSON.parse(xhr.responseText);
+        resolve(data.url || `https://nexuserv.duckdns.org${data.path}`);
       } else {
         reject(new Error(`Upload failed: ${xhr.status}`));
       }
@@ -141,62 +254,58 @@ export async function uploadAppFile(appId, file, onProgress) {
     xhr.addEventListener('error', () => reject(new Error('Network error')));
     xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
 
-    xhr.open('POST', `${API_BASE}/upload/app/${appId}`);
+    xhr.open('POST', `${API_BASE}/upload/file`);
     xhr.setRequestHeader('Authorization', `Bearer ${token}`);
     xhr.send(formData);
   });
 }
 
-export async function uploadIcon(appId, file) {
-  const token = localStorage.getItem('nexusstore_token');
-  const formData = new FormData();
-  formData.append('icon', file);
+// ============= DOWNLOAD =============
 
-  const response = await fetch(`${API_BASE}/upload/icon/${appId}`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`
-    },
-    body: formData
-  });
+export function downloadApp(app) {
+  if (app.apkUrl) {
+    // Increment download count (fire and forget)
+    incrementDownloads(app.id).catch(console.error);
 
-  if (!response.ok) {
-    throw new Error('Icon upload failed');
+    // Trigger download
+    const link = document.createElement('a');
+    link.href = app.apkUrl;
+    link.download = `${app.name || 'app'}.apk`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
-
-  return response.json();
 }
 
-// ============= DOWNLOAD API =============
+// ============= CATEGORIES =============
 
-export function getDownloadUrl(appId) {
-  const token = localStorage.getItem('nexusstore_token');
-  return `${API_BASE}/apps/${appId}/download${token ? `?token=${token}` : ''}`;
+export function getCategories() {
+  return [
+    { id: 'all', name: 'Tous' },
+    { id: 'games', name: 'Jeux' },
+    { id: 'utils', name: 'Utilitaires' },
+    { id: 'social', name: 'Social' },
+    { id: 'media', name: 'Média' },
+    { id: 'productivity', name: 'Productivité' },
+    { id: 'finance', name: 'Finance' },
+    { id: 'health', name: 'Santé' },
+    { id: 'education', name: 'Éducation' },
+    { id: 'other', name: 'Autre' }
+  ];
 }
 
-export async function downloadApp(appId) {
-  const url = getDownloadUrl(appId);
-  window.location.href = url;
-}
+// ============= STATS =============
 
-// ============= PAYMENT API =============
+export async function getStats() {
+  const { apps } = await getApps();
 
-export async function createCheckoutSession(appId) {
-  return fetchAPI('/checkout', {
-    method: 'POST',
-    body: JSON.stringify({ appId })
-  });
-}
+  const totalDownloads = apps.reduce((sum, app) => sum + (app.downloads || 0), 0);
+  const totalApps = apps.length;
+  const developers = new Set(apps.map(app => app.developer)).size;
 
-// ============= REVIEWS API =============
-
-export async function getReviews(appId) {
-  return fetchAPI(`/apps/${appId}/reviews`);
-}
-
-export async function createReview(appId, rating, comment) {
-  return fetchAPI(`/apps/${appId}/reviews`, {
-    method: 'POST',
-    body: JSON.stringify({ rating, comment })
-  });
+  return {
+    apps: totalApps,
+    downloads: totalDownloads,
+    developers: developers || 1
+  };
 }

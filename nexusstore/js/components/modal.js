@@ -1,5 +1,6 @@
 import { icons } from '../icons.js';
-import { state, setState } from '../state.js';
+import { state, setState, showToast } from '../state.js';
+import * as api from '../api.js';
 
 // Map of icon names to icon SVGs
 const appIcons = {
@@ -20,29 +21,36 @@ function formatDownloads(num) {
   return num.toString();
 }
 
-// Format file size
-function formatSize(bytes) {
-  if (!bytes) return 'N/A';
-  if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(1) + ' GB';
-  if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
-  if (bytes >= 1024) return (bytes / 1024).toFixed(1) + ' KB';
-  return bytes + ' B';
+// Render app icon
+function renderIcon(app) {
+  if (app.icon && app.icon.startsWith('http')) {
+    return `<img src="${app.icon}" alt="${escapeHtml(app.name)}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 12px;">`;
+  }
+  return appIcons[app.icon] || icons.apps;
 }
 
-// Format price
-function formatPrice(price) {
-  if (price === 0) return 'Gratuit';
-  return price.toFixed(2) + '€';
+// Get category name
+function getCategoryName(categoryId) {
+  const categories = {
+    games: 'Jeux',
+    utils: 'Utilitaires',
+    social: 'Social',
+    media: 'Média',
+    productivity: 'Productivité',
+    finance: 'Finance',
+    health: 'Santé',
+    education: 'Éducation',
+    other: 'Autre'
+  };
+  return categories[categoryId] || categoryId || 'Applications';
 }
 
 export function renderModal() {
   const { selectedApp } = state;
   if (!selectedApp) return '';
 
-  const icon = appIcons[selectedApp.icon] || icons.apps;
   const downloads = formatDownloads(selectedApp.downloads || 0);
-  const price = formatPrice(selectedApp.price || 0);
-  const size = formatSize(selectedApp.size);
+  const hasImageIcon = selectedApp.icon && selectedApp.icon.startsWith('http');
 
   return `
     <div class="modal-overlay" onclick="window.closeModal()">
@@ -52,19 +60,21 @@ export function renderModal() {
         </button>
 
         <div class="modal-header">
-          <div class="modal-icon">${icon}</div>
+          <div class="modal-icon" ${hasImageIcon ? 'style="overflow: hidden;"' : ''}>
+            ${renderIcon(selectedApp)}
+          </div>
           <div class="modal-info">
             <h2 class="modal-title">${escapeHtml(selectedApp.name)}</h2>
-            <p class="modal-dev">${escapeHtml(selectedApp.developer || selectedApp.developer_name || 'Développeur')}</p>
+            <p class="modal-dev">${escapeHtml(selectedApp.developer || 'Développeur')}</p>
             <div class="modal-badges">
-              <span class="type-badge">${(selectedApp.type || 'APK').toUpperCase()}</span>
-              <span class="rating-badge">${icons.star} ${selectedApp.rating || '4.5'}</span>
+              <span class="type-badge">APK</span>
+              <span class="rating-badge">${icons.star} ${selectedApp.rating || '5.0'}</span>
             </div>
           </div>
         </div>
 
         <p class="modal-desc">
-          ${selectedApp.description || selectedApp.short_description || `Application de qualité professionnelle. Rejoignez ${downloads} utilisateurs satisfaits.`}
+          ${selectedApp.description || `Application disponible sur NexusStore. Téléchargez-la gratuitement !`}
         </p>
 
         <div class="modal-details">
@@ -73,61 +83,21 @@ export function renderModal() {
             <span class="modal-detail-value">${selectedApp.version || '1.0.0'}</span>
           </div>
           <div class="modal-detail-item">
-            <span class="modal-detail-label">Taille</span>
-            <span class="modal-detail-value">${size}</span>
+            <span class="modal-detail-label">Téléchargements</span>
+            <span class="modal-detail-value">${downloads}</span>
           </div>
           <div class="modal-detail-item">
             <span class="modal-detail-label">Catégorie</span>
-            <span class="modal-detail-value">${escapeHtml(selectedApp.category || 'Apps')}</span>
-          </div>
-        </div>
-
-        ${selectedApp.package_name ? `
-        <div class="modal-details" style="grid-template-columns: 1fr; margin-bottom: 16px;">
-          <div class="modal-detail-item" style="text-align: left;">
-            <span class="modal-detail-label">Package</span>
-            <span class="modal-detail-value" style="font-family: monospace; font-size: 12px;">${escapeHtml(selectedApp.package_name)}</span>
-          </div>
-        </div>
-        ` : ''}
-
-        <div class="modal-stats" style="display: flex; justify-content: center; gap: 24px; margin-bottom: 24px; padding: 16px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
-          <div style="text-align: center;">
-            <div style="font-size: 20px; font-weight: 700; color: var(--accent);">${downloads}</div>
-            <div style="font-size: 11px; color: var(--text-muted);">Téléchargements</div>
-          </div>
-          <div style="text-align: center;">
-            <div style="font-size: 20px; font-weight: 700;">${selectedApp.rating || '4.5'}</div>
-            <div style="font-size: 11px; color: var(--text-muted);">Note moyenne</div>
-          </div>
-          <div style="text-align: center;">
-            <div style="font-size: 20px; font-weight: 700;">${selectedApp.rating_count || '0'}</div>
-            <div style="font-size: 11px; color: var(--text-muted);">Avis</div>
+            <span class="modal-detail-value">${getCategoryName(selectedApp.category)}</span>
           </div>
         </div>
 
         <div class="modal-footer">
-          <div class="modal-price">${price}</div>
-          <button class="btn-primary-large" onclick="window.handleDownload('${selectedApp.id}')">
+          <div class="modal-price">Gratuit</div>
+          <button class="btn-primary-large" onclick="window.handleDownload(${selectedApp.id})">
             ${icons.download}
-            <span>${selectedApp.price > 0 ? 'Acheter' : 'Télécharger'}</span>
+            <span>Télécharger</span>
           </button>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-// Confirmation modal
-export function renderConfirmModal(title, message, onConfirm, onCancel) {
-  return `
-    <div class="modal-overlay" onclick="window.closeConfirmModal()">
-      <div class="modal" onclick="event.stopPropagation()" style="max-width: 400px;">
-        <h2 class="modal-title" style="margin-bottom: 12px;">${escapeHtml(title)}</h2>
-        <p class="modal-desc">${escapeHtml(message)}</p>
-        <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px;">
-          <button class="btn-secondary" onclick="window.closeConfirmModal()">Annuler</button>
-          <button class="btn-primary" onclick="window.confirmAction()">Confirmer</button>
         </div>
       </div>
     </div>
@@ -149,32 +119,15 @@ window.closeModal = function() {
 };
 
 window.handleDownload = function(id) {
-  const app = state.selectedApp;
+  const app = state.selectedApp || state.apps.find(a => a.id === id || a.id === parseInt(id));
   if (!app) return;
 
-  if (app.price > 0) {
-    if (!state.isAuthenticated) {
-      window.closeModal();
-      window.navigate('/login');
-      return;
-    }
-    // Handle paid app purchase
-    import('../api.js').then(api => {
-      api.createCheckoutSession(id).then(session => {
-        if (session.url) {
-          window.location.href = session.url;
-        }
-      }).catch(err => {
-        console.error('Checkout error:', err);
-        import('../state.js').then(({ showToast }) => {
-          showToast('Erreur lors du paiement', 'error');
-        });
-      });
-    });
-  } else {
-    // Free app download
-    window.downloadAppById(id);
+  if (app.apkUrl) {
+    api.downloadApp(app);
+    showToast('Téléchargement démarré', 'success');
     window.closeModal();
+  } else {
+    showToast('Fichier non disponible', 'error');
   }
 };
 

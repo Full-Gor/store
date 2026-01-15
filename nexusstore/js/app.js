@@ -8,136 +8,84 @@ import { renderDeveloperPage, initDeveloperPage } from './pages/developer.js';
 import { renderLoginPage } from './pages/login.js';
 import { renderRegisterPage } from './pages/register.js';
 import { icons } from './icons.js';
+import * as api from './api.js';
 
-// Mock data for development
-const mockApps = [
+// Default apps (shown when API is empty or unavailable)
+const defaultApps = [
   {
     id: 1,
     name: 'NexusChat',
     developer: 'TechForge Labs',
     icon: 'message',
-    category: 'Communication',
+    category: 'social',
     price: 0,
     rating: 4.8,
     downloads: 125400,
     type: 'apk',
     isHot: true,
     version: '2.4.1',
-    size: 25165824,
-    description: 'Application de messagerie instantanée sécurisée avec chiffrement de bout en bout.'
+    description: 'Application de messagerie instantanée sécurisée.'
   },
   {
     id: 2,
     name: 'PhotoMaster Pro',
     developer: 'Creative Studio',
     icon: 'camera',
-    category: 'Photo & Vidéo',
-    price: 4.99,
+    category: 'media',
+    price: 0,
     rating: 4.6,
     downloads: 89000,
     type: 'apk',
     isHot: false,
     version: '3.1.0',
-    size: 52428800,
-    description: 'Éditeur photo professionnel avec filtres avancés et outils de retouche.'
+    description: 'Éditeur photo professionnel avec filtres avancés.'
   },
   {
     id: 3,
     name: 'FitTrack',
     developer: 'HealthTech',
     icon: 'activity',
-    category: 'Santé & Fitness',
-    price: 2.99,
+    category: 'health',
+    price: 0,
     rating: 4.9,
     downloads: 234000,
-    type: 'pwa',
+    type: 'apk',
     isHot: true,
     version: '1.8.5',
-    size: 8388608,
-    description: 'Suivez vos activités sportives, votre alimentation et votre sommeil.'
+    description: 'Suivez vos activités sportives et votre alimentation.'
   },
   {
     id: 4,
     name: 'CodePad',
     developer: 'DevTools Inc',
     icon: 'code',
-    category: 'Productivité',
+    category: 'productivity',
     price: 0,
     rating: 4.7,
     downloads: 67000,
-    type: 'pwa',
+    type: 'apk',
     isHot: false,
     version: '2.0.0',
-    size: 4194304,
-    description: 'Éditeur de code léger avec coloration syntaxique et support multi-langage.'
-  },
-  {
-    id: 5,
-    name: 'BudgetWise',
-    developer: 'FinApp Studio',
-    icon: 'wallet',
-    category: 'Finance',
-    price: 1.99,
-    rating: 4.5,
-    downloads: 156000,
-    type: 'apk',
-    isHot: true,
-    version: '4.2.0',
-    size: 31457280,
-    description: 'Gérez vos finances personnelles et suivez vos dépenses facilement.'
-  },
-  {
-    id: 6,
-    name: 'MusicFlow',
-    developer: 'SoundWave',
-    icon: 'music',
-    category: 'Musique',
-    price: 0,
-    rating: 4.4,
-    downloads: 98000,
-    type: 'apk',
-    isHot: false,
-    version: '5.0.2',
-    size: 41943040,
-    description: 'Lecteur de musique élégant avec égaliseur et support des playlists.'
-  },
-  {
-    id: 7,
-    name: 'WorldExplorer',
-    developer: 'TravelApps',
-    icon: 'globe',
-    category: 'Voyage',
-    price: 0,
-    rating: 4.3,
-    downloads: 45000,
-    type: 'pwa',
-    isHot: false,
-    version: '1.5.0',
-    size: 6291456,
-    description: 'Découvrez des destinations de voyage et planifiez vos aventures.'
-  },
-  {
-    id: 8,
-    name: 'SecureVault',
-    developer: 'CyberSafe',
-    icon: 'phone',
-    category: 'Utilitaires',
-    price: 3.99,
-    rating: 4.8,
-    downloads: 78000,
-    type: 'apk',
-    isHot: true,
-    version: '2.1.0',
-    size: 15728640,
-    description: 'Gestionnaire de mots de passe sécurisé avec synchronisation cloud.'
+    description: 'Éditeur de code léger avec coloration syntaxique.'
   }
 ];
 
-// Initialize state with mock data
-setState({
-  apps: mockApps,
-  filteredApps: mockApps
-});
+// Load apps from API
+async function loadApps() {
+  try {
+    const { apps } = await api.getApps();
+    if (apps && apps.length > 0) {
+      setState({ apps, filteredApps: apps });
+    } else {
+      // Use default apps if API returns empty
+      setState({ apps: defaultApps, filteredApps: defaultApps });
+    }
+  } catch (error) {
+    console.error('Error loading apps:', error);
+    // Use default apps on error
+    setState({ apps: defaultApps, filteredApps: defaultApps });
+  }
+}
 
 // Render current page content
 function renderPage() {
@@ -220,13 +168,16 @@ window.renderApp = function() {
 };
 
 // Export for external use
-export { renderPage };
+export { renderPage, loadApps };
 
 // Application startup
-function init() {
+async function init() {
   try {
     // Restore user session
     restoreSession();
+
+    // Initialize with default apps first (fast render)
+    setState({ apps: defaultApps, filteredApps: defaultApps });
 
     // Initialize router
     initRouter();
@@ -234,15 +185,22 @@ function init() {
     // Initial render
     window.renderApp();
 
-    // Log startup
+    // Load apps from API in background
+    loadApps().then(() => {
+      window.renderApp();
+    });
+
     console.log('NexusStore initialized');
   } catch (error) {
     console.error('Error initializing app:', error);
     document.getElementById('app').innerHTML = `
       <div style="padding: 40px; text-align: center; color: #fff;">
         <h1 style="color: #c8ff00; margin-bottom: 16px;">Erreur</h1>
-        <p>Une erreur s'est produite lors du chargement de l'application.</p>
+        <p>Une erreur s'est produite lors du chargement.</p>
         <p style="margin-top: 8px; color: #888;">${error.message}</p>
+        <button onclick="location.reload()" style="margin-top: 16px; padding: 10px 20px; background: #c8ff00; color: #0a0a0a; border: none; border-radius: 8px; cursor: pointer;">
+          Réessayer
+        </button>
       </div>
     `;
   }
