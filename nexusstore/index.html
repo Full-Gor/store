@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="NexusStore - La marketplace indépendante pour vos applications Android APK, AAB et PWA">
+  <meta name="keywords" content="android, apk, pwa, apps, marketplace, store, téléchargement">
+  <meta name="author" content="NexusStore">
+  <meta name="theme-color" content="#0a0a0a">
+
+  <!-- Open Graph / Social Media -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="NexusStore - Marketplace Apps Android & PWA">
+  <meta property="og:description" content="Découvrez, téléchargez et publiez des applications Android et PWA en toute liberté.">
+  <meta property="og:image" content="/assets/images/og-image.png">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="NexusStore - Marketplace Apps Android & PWA">
+  <meta name="twitter:description" content="Découvrez, téléchargez et publiez des applications Android et PWA en toute liberté.">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c8ff00' stroke-width='1.5'><path d='M12 2L21.5 7.5V16.5L12 22L2.5 16.5V7.5L12 2Z'/></svg>">
+
+  <title>NexusStore - Marketplace Apps Android & PWA</title>
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/reset.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/responsive.css">
+
+  <!-- Preload critical resources -->
+  <link rel="preload" href="js/app.js" as="script" crossorigin>
+
+  <style>
+    /* Critical CSS for initial load */
+    .initial-loader {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #0a0a0a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    .initial-loader-content {
+      text-align: center;
+    }
+    .initial-loader-logo {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 16px;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    .initial-loader-text {
+      color: #c8ff00;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 18px;
+      font-weight: 600;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.7; transform: scale(0.95); }
+    }
+  </style>
+</head>
+<body>
+  <!-- Initial loader (removed by JS) -->
+  <div class="initial-loader" id="initialLoader">
+    <div class="initial-loader-content">
+      <div class="initial-loader-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#c8ff00" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2L21.5 7.5V16.5L12 22L2.5 16.5V7.5L12 2Z"/>
+        </svg>
+      </div>
+      <div class="initial-loader-text">NexusStore</div>
+    </div>
+  </div>
+
+  <!-- App container -->
+  <div id="app"></div>
+
+  <!-- JavaScript -->
+  <script type="module" src="js/app.js"></script>
+
+  <!-- Remove initial loader when app is ready -->
+  <script>
+    window.addEventListener('load', function() {
+      setTimeout(function() {
+        var loader = document.getElementById('initialLoader');
+        if (loader) {
+          loader.style.opacity = '0';
+          loader.style.transition = 'opacity 0.3s ease';
+          setTimeout(function() {
+            loader.remove();
+          }, 300);
+        }
+      }, 500);
+    });
+  </script>
+
+  <!-- Noscript fallback -->
+  <noscript>
+    <style>
+      .initial-loader { display: none; }
+      #app { display: none; }
+    </style>
+    <div style="padding: 40px; text-align: center; color: #fff; background: #0a0a0a; min-height: 100vh;">
+      <h1 style="color: #c8ff00; margin-bottom: 16px;">NexusStore</h1>
+      <p>JavaScript est requis pour utiliser cette application.</p>
+      <p style="margin-top: 8px; color: #888;">Veuillez activer JavaScript dans votre navigateur.</p>
+    </div>
+  </noscript>
+</body>
+</html>
