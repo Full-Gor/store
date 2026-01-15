@@ -1,0 +1,44 @@
+{
+  "name": "nexusstore-api",
+  "version": "1.0.0",
+  "description": "NexusStore API - Marketplace for Android APK/AAB & PWA",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test",
+    "lint": "eslint src/",
+    "db:migrate": "node src/utils/migrate.js",
+    "db:seed": "node src/utils/seed.js"
+  },
+  "keywords": [
+    "marketplace",
+    "android",
+    "apk",
+    "pwa",
+    "api"
+  ],
+  "author": "NexusStore",
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "compression": "^1.7.4",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "pg": "^8.11.3",
+    "stripe": "^14.10.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "eslint": "^8.55.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

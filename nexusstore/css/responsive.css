@@ -1,0 +1,308 @@
+/* === TABLET (768px+) === */
+@media (min-width: 768px) {
+  .header-inner {
+    padding: 12px 24px;
+  }
+
+  .desktop-nav {
+    display: flex;
+  }
+
+  .desktop-actions {
+    display: flex;
+  }
+
+  .mobile-menu-btn {
+    display: none;
+  }
+
+  .main {
+    padding: 32px 24px;
+  }
+
+  .hero-title {
+    font-size: 36px;
+  }
+
+  .hero-subtitle {
+    font-size: 16px;
+    max-width: 500px;
+  }
+
+  .apps-grid {
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 16px;
+  }
+
+  .app-card {
+    width: 170px;
+    padding: 20px;
+  }
+
+  .app-card-icon {
+    width: 56px;
+    height: 56px;
+  }
+
+  .app-card-name {
+    font-size: 14px;
+  }
+
+  .dev-stats-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .pricing-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .modal {
+    border-radius: var(--radius-xl);
+    max-width: 480px;
+  }
+
+  .modal-overlay {
+    align-items: center;
+    padding: 24px;
+  }
+
+  @keyframes slideUp {
+    from {
+      transform: translateY(20px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  .categories-wrapper {
+    margin: 0 0 20px;
+    padding: 0;
+  }
+
+  .apps-scroll {
+    margin: 0;
+    padding: 0 0 8px;
+  }
+
+  .page-auth {
+    margin: 80px auto;
+  }
+
+  .auth-card {
+    padding: 40px 32px;
+  }
+}
+
+/* === LARGE DESKTOP (1024px+) === */
+@media (min-width: 1024px) {
+  .hero {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 48px 0;
+  }
+
+  .hero-content {
+    text-align: left;
+    margin-bottom: 0;
+    max-width: 500px;
+  }
+
+  .hero-title {
+    justify-content: flex-start;
+    font-size: 42px;
+  }
+
+  .hero-subtitle {
+    margin-left: 0;
+    margin-right: 0;
+    max-width: 100%;
+  }
+
+  .hero-buttons {
+    justify-content: flex-start;
+  }
+
+  .stats-row {
+    gap: 48px;
+  }
+
+  .stat-value {
+    font-size: 40px;
+  }
+
+  .stat-label {
+    font-size: 13px;
+  }
+
+  .apps-grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  }
+
+  .section-title {
+    font-size: 20px;
+  }
+
+  .page-title {
+    font-size: 28px;
+  }
+
+  .modal {
+    max-width: 520px;
+  }
+
+  .modal-icon {
+    width: 72px;
+    height: 72px;
+  }
+
+  .modal-title {
+    font-size: 22px;
+  }
+}
+
+/* === EXTRA LARGE (1280px+) === */
+@media (min-width: 1280px) {
+  .main {
+    padding: 40px 24px;
+  }
+
+  .hero {
+    padding: 64px 0;
+  }
+
+  .hero-title {
+    font-size: 48px;
+  }
+
+  .stat-value {
+    font-size: 48px;
+  }
+
+  .apps-grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px;
+  }
+
+  .app-card {
+    width: 200px;
+    padding: 24px;
+  }
+
+  .app-card-icon {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 14px;
+  }
+
+  .app-card-name {
+    font-size: 15px;
+  }
+
+  .pricing-card {
+    padding: 32px;
+  }
+
+  .pricing-price {
+    font-size: 42px;
+  }
+}
+
+/* === MOBILE SMALL (320px - 374px) === */
+@media (max-width: 374px) {
+  .hero-title {
+    font-size: 24px;
+  }
+
+  .hero-buttons {
+    flex-direction: column;
+  }
+
+  .hero-buttons .btn-primary,
+  .hero-buttons .btn-secondary {
+    width: 100%;
+  }
+
+  .stats-row {
+    gap: 20px;
+  }
+
+  .stat-value {
+    font-size: 28px;
+  }
+
+  .app-card {
+    width: 130px;
+    padding: 14px;
+  }
+
+  .app-card-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .app-card-name {
+    font-size: 12px;
+  }
+
+  .app-card-dev {
+    font-size: 10px;
+  }
+}
+
+/* === REDUCED MOTION === */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* === DARK MODE PREFERENCE (already dark, but could add light mode) === */
+@media (prefers-color-scheme: light) {
+  /* Keep dark theme - this is a dark-first design */
+}
+
+/* === HIGH CONTRAST === */
+@media (prefers-contrast: high) {
+  :root {
+    --border: #444444;
+    --text-secondary: #aaaaaa;
+    --text-muted: #999999;
+  }
+
+  .app-card,
+  .app-row,
+  .btn-secondary,
+  .search-box,
+  .category-chip {
+    border-width: 2px;
+  }
+}
+
+/* === PRINT === */
+@media print {
+  .header,
+  .mobile-menu,
+  .btn-primary,
+  .btn-secondary,
+  .download-btn,
+  .modal-overlay {
+    display: none !important;
+  }
+
+  body {
+    background: white;
+    color: black;
+  }
+
+  .main {
+    max-width: 100%;
+  }
+}
