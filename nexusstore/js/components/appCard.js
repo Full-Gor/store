@@ -1,7 +1,8 @@
 import { icons } from '../icons.js';
-import { state, setState } from '../state.js';
+import { state, setState, showToast } from '../state.js';
+import * as api from '../api.js';
 
-// Map of icon names to icon SVGs
+// Map of icon names to icon SVGs (for default apps)
 const appIcons = {
   message: icons.message,
   camera: icons.camera,
@@ -20,27 +21,31 @@ function formatDownloads(num) {
   return num.toString();
 }
 
-// Format price
-function formatPrice(price) {
-  if (price === 0) return 'Gratuit';
-  return price.toFixed(2) + '€';
+// Render app icon (handles both URL and icon name)
+function renderIcon(app, size = 48) {
+  // If app has an icon URL, show it as image
+  if (app.icon && app.icon.startsWith('http')) {
+    return `<img src="${app.icon}" alt="${escapeHtml(app.name)}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;">`;
+  }
+  // Otherwise use SVG icon
+  return appIcons[app.icon] || icons.apps;
 }
 
 // Render app card (grid view)
 export function renderAppCard(app) {
-  const icon = appIcons[app.icon] || icons.apps;
+  const hasImageIcon = app.icon && app.icon.startsWith('http');
 
   return `
-    <div class="app-card" onclick="window.selectApp('${app.id}')">
-      <div class="app-card-icon">
-        ${icon}
-        ${app.isHot || app.is_hot ? '<span class="hot-dot"></span>' : ''}
+    <div class="app-card" onclick="window.selectApp(${app.id})">
+      <div class="app-card-icon" ${hasImageIcon ? 'style="overflow: hidden;"' : ''}>
+        ${renderIcon(app)}
+        ${app.isHot || app.featured ? '<span class="hot-dot"></span>' : ''}
       </div>
       <h3 class="app-card-name">${escapeHtml(app.name)}</h3>
-      <p class="app-card-dev">${escapeHtml(app.developer || app.developer_name || 'Développeur')}</p>
+      <p class="app-card-dev">${escapeHtml(app.developer || 'Développeur')}</p>
       <div class="app-card-meta">
-        <span class="type-badge">${(app.type || 'APK').toUpperCase()}</span>
-        <span class="rating-small">${icons.star} ${app.rating || '4.5'}</span>
+        <span class="type-badge">APK</span>
+        <span class="rating-small">${icons.star} ${app.rating || '5.0'}</span>
       </div>
     </div>
   `;
@@ -48,25 +53,26 @@ export function renderAppCard(app) {
 
 // Render app row (list view)
 export function renderAppRow(app) {
-  const icon = appIcons[app.icon] || icons.apps;
   const downloads = formatDownloads(app.downloads || 0);
-  const price = formatPrice(app.price || 0);
+  const hasImageIcon = app.icon && app.icon.startsWith('http');
 
   return `
-    <div class="app-row" onclick="window.selectApp('${app.id}')">
-      <div class="app-row-icon">${icon}</div>
+    <div class="app-row" onclick="window.selectApp(${app.id})">
+      <div class="app-row-icon" ${hasImageIcon ? 'style="overflow: hidden;"' : ''}>
+        ${renderIcon(app)}
+      </div>
       <div class="app-row-info">
         <h3 class="app-row-name">${escapeHtml(app.name)}</h3>
-        <p class="app-row-dev">${escapeHtml(app.developer || app.developer_name || 'Développeur')}</p>
+        <p class="app-row-dev">${escapeHtml(app.developer || 'Développeur')}</p>
         <div class="app-row-meta">
-          <span class="rating-small">${icons.star} ${app.rating || '4.5'}</span>
+          <span class="rating-small">${icons.star} ${app.rating || '5.0'}</span>
           <span class="download-small">${downloads}</span>
-          <span class="type-badge-small">${(app.type || 'APK').toUpperCase()}</span>
+          <span class="type-badge-small">APK</span>
         </div>
       </div>
       <div class="app-row-right">
-        <div class="app-row-price">${price}</div>
-        <button class="download-btn" onclick="event.stopPropagation(); window.downloadAppById('${app.id}')">
+        <div class="app-row-price">Gratuit</div>
+        <button class="download-btn" onclick="event.stopPropagation(); window.downloadAppById(${app.id})">
           ${icons.download}
         </button>
       </div>
@@ -76,20 +82,20 @@ export function renderAppRow(app) {
 
 // Render featured app card (larger)
 export function renderFeaturedCard(app) {
-  const icon = appIcons[app.icon] || icons.apps;
   const downloads = formatDownloads(app.downloads || 0);
+  const hasImageIcon = app.icon && app.icon.startsWith('http');
 
   return `
-    <div class="app-card featured" onclick="window.selectApp('${app.id}')" style="width: 200px;">
-      <div class="app-card-icon" style="width: 64px; height: 64px;">
-        ${icon}
+    <div class="app-card featured" onclick="window.selectApp(${app.id})" style="width: 200px;">
+      <div class="app-card-icon" style="width: 64px; height: 64px; ${hasImageIcon ? 'overflow: hidden;' : ''}">
+        ${renderIcon(app)}
         <span class="hot-dot"></span>
       </div>
       <h3 class="app-card-name" style="font-size: 15px;">${escapeHtml(app.name)}</h3>
-      <p class="app-card-dev">${escapeHtml(app.developer || app.developer_name || 'Développeur')}</p>
+      <p class="app-card-dev">${escapeHtml(app.developer || 'Développeur')}</p>
       <div class="app-card-meta">
-        <span class="type-badge">${(app.type || 'APK').toUpperCase()}</span>
-        <span class="rating-small">${icons.star} ${app.rating || '4.5'}</span>
+        <span class="type-badge">APK</span>
+        <span class="rating-small">${icons.star} ${app.rating || '5.0'}</span>
         <span class="download-small">${downloads}</span>
       </div>
     </div>
@@ -98,6 +104,7 @@ export function renderFeaturedCard(app) {
 
 // HTML escape helper
 function escapeHtml(text) {
+  if (!text) return '';
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
@@ -115,18 +122,12 @@ window.selectApp = function(id) {
 window.downloadAppById = function(id) {
   const app = state.apps.find(a => a.id === id || a.id === parseInt(id));
   if (app) {
-    if (app.price > 0 && !state.isAuthenticated) {
-      // Redirect to login for paid apps
-      window.navigate('/login');
-      return;
+    if (app.apkUrl) {
+      // Download the APK
+      api.downloadApp(app);
+      showToast('Téléchargement démarré', 'success');
+    } else {
+      showToast('Fichier non disponible', 'error');
     }
-
-    // For now, just log - real implementation would call API
-    console.log('Downloading app:', app.name);
-    import('../api.js').then(api => {
-      api.downloadApp(id);
-    }).catch(err => {
-      console.log('Download initiated for:', app.name);
-    });
   }
 };

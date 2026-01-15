@@ -1,29 +1,38 @@
 import { icons } from '../icons.js';
 import { state, setState, showToast } from '../state.js';
-import { renderUploadZone, initUploadZone, validateFile } from '../components/uploadZone.js';
+import * as api from '../api.js';
 
 export function renderDeveloperPage() {
-  const { isAuthenticated, user, developerStats } = state;
+  const { isAuthenticated, user } = state;
 
   return `
     <div class="page-developer">
       <div class="page-header">
-        <h1 class="page-title">Espace Développeur</h1>
-        <p class="page-subtitle">Publiez et monétisez vos applications</p>
+        <h1 class="page-title">Espace Admin</h1>
+        <p class="page-subtitle">Gérez les applications du store</p>
       </div>
 
-      ${isAuthenticated ? renderDeveloperDashboard(user, developerStats) : renderDeveloperLanding()}
+      ${isAuthenticated ? renderAdminDashboard(user) : renderLoginPrompt()}
     </div>
   `;
 }
 
-function renderDeveloperDashboard(user, stats) {
+function renderAdminDashboard(user) {
+  const { apps } = state;
+  const totalDownloads = apps.reduce((sum, app) => sum + (app.downloads || 0), 0);
+
   return `
     <div class="dev-dashboard">
       <!-- Welcome -->
-      <div style="margin-bottom: 32px;">
-        <h2 style="font-size: 20px; margin-bottom: 4px;">Bonjour, ${escapeHtml(user?.name || 'Développeur')}</h2>
-        <p style="color: var(--text-muted); font-size: 14px;">Voici un aperçu de vos performances</p>
+      <div style="margin-bottom: 32px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+        <div>
+          <h2 style="font-size: 20px; margin-bottom: 4px;">Bonjour, ${escapeHtml(user?.name || user?.userId || 'Admin')}</h2>
+          <p style="color: var(--text-muted); font-size: 14px;">Gérez votre marketplace</p>
+        </div>
+        <button class="btn-secondary" onclick="window.handleLogout()">
+          ${icons.logout}
+          <span>Déconnexion</span>
+        </button>
       </div>
 
       <!-- Stats Grid -->
@@ -31,74 +40,127 @@ function renderDeveloperDashboard(user, stats) {
         <div class="dev-stat-card">
           <div class="dev-stat-icon">${icons.apps}</div>
           <div>
-            <div class="dev-stat-value">${stats.apps || 0}</div>
+            <div class="dev-stat-value">${apps.length}</div>
             <div class="dev-stat-label">Applications</div>
           </div>
         </div>
         <div class="dev-stat-card">
           <div class="dev-stat-icon">${icons.download}</div>
           <div>
-            <div class="dev-stat-value">${formatNumber(stats.downloads || 0)}</div>
+            <div class="dev-stat-value">${formatNumber(totalDownloads)}</div>
             <div class="dev-stat-label">Téléchargements</div>
-          </div>
-        </div>
-        <div class="dev-stat-card">
-          <div class="dev-stat-icon">${icons.dollar}</div>
-          <div>
-            <div class="dev-stat-value">${stats.revenue || 0}€</div>
-            <div class="dev-stat-label">Revenus</div>
-          </div>
-        </div>
-        <div class="dev-stat-card">
-          <div class="dev-stat-icon">${icons.star}</div>
-          <div>
-            <div class="dev-stat-value">${stats.rating || '--'}</div>
-            <div class="dev-stat-label">Note moyenne</div>
           </div>
         </div>
       </div>
 
-      <!-- Upload Section -->
+      <!-- Add New App -->
       <section class="section" style="margin-top: 32px;">
         <h3 class="section-title" style="margin-bottom: 16px;">
-          ${icons.upload}
-          <span>Publier une nouvelle application</span>
+          ${icons.plus}
+          <span>Ajouter une application</span>
         </h3>
-        ${renderUploadZone()}
+        ${renderAddAppForm()}
       </section>
 
-      <!-- My Apps Section -->
+      <!-- Apps List -->
       <section class="section" style="margin-top: 32px;">
         <div class="section-header">
           <h3 class="section-title">
             ${icons.apps}
-            <span>Mes applications</span>
+            <span>Applications (${apps.length})</span>
           </h3>
-          <button class="btn-link" onclick="window.loadDeveloperApps()">
+          <button class="btn-link" onclick="window.refreshApps()">
             Actualiser
           </button>
         </div>
-        <div id="developerApps">
-          ${renderDeveloperApps()}
+        <div id="appsListContainer">
+          ${renderAppsList(apps)}
         </div>
       </section>
     </div>
   `;
 }
 
-function renderDeveloperApps() {
-  const myApps = state.apps.filter(app =>
-    app.developer_id === state.user?.id ||
-    app.developer === state.user?.name
-  );
+function renderAddAppForm() {
+  const categories = api.getCategories().filter(c => c.id !== 'all');
 
-  if (myApps.length === 0) {
+  return `
+    <div class="auth-card" style="max-width: 100%;">
+      <form id="addAppForm" onsubmit="window.handleAddApp(event)">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+          <div class="form-group">
+            <label class="form-label">Nom de l'app *</label>
+            <input type="text" name="name" class="form-input" placeholder="Mon Application" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Développeur</label>
+            <input type="text" name="developer" class="form-input" placeholder="Nom du développeur">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Version</label>
+            <input type="text" name="version" class="form-input" placeholder="1.0.0" value="1.0.0">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Catégorie</label>
+            <select name="category" class="form-input form-select">
+              ${categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-top: 16px;">
+          <label class="form-label">Description</label>
+          <textarea name="description" class="form-input" rows="3" placeholder="Description de l'application..."></textarea>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px;">
+          <div class="form-group">
+            <label class="form-label">Icône (image)</label>
+            <input type="file" id="iconFile" accept="image/*" class="form-input" style="padding: 8px;">
+            <small style="color: var(--text-muted);">PNG, JPG, WebP</small>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Fichier APK *</label>
+            <input type="file" id="apkFile" accept=".apk" class="form-input" style="padding: 8px;" required>
+            <small style="color: var(--text-muted);">Fichier .apk uniquement</small>
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 16px; margin-top: 16px;">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" name="featured" style="accent-color: var(--accent);">
+            <span style="font-size: 14px;">Mettre en avant</span>
+          </label>
+        </div>
+
+        <div id="uploadProgress" style="display: none; margin-top: 16px;">
+          <div style="background: var(--bg-tertiary); border-radius: 4px; overflow: hidden;">
+            <div id="progressBar" style="height: 8px; background: var(--accent); width: 0%; transition: width 0.3s;"></div>
+          </div>
+          <p id="progressText" style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">Upload en cours...</p>
+        </div>
+
+        <button type="submit" id="submitBtn" class="btn-primary" style="width: 100%; justify-content: center; margin-top: 24px;">
+          ${icons.upload}
+          <span>Publier l'application</span>
+        </button>
+      </form>
+    </div>
+  `;
+}
+
+function renderAppsList(apps) {
+  if (!apps || apps.length === 0) {
     return `
       <div class="empty-state" style="padding: 32px;">
         <div class="empty-icon">${icons.apps}</div>
-        <p>Vous n'avez pas encore publié d'application</p>
+        <p>Aucune application dans le store</p>
         <p style="font-size: 13px; color: var(--text-muted); margin-top: 8px;">
-          Utilisez la zone ci-dessus pour uploader votre première app
+          Utilisez le formulaire ci-dessus pour ajouter votre première app
         </p>
       </div>
     `;
@@ -106,42 +168,27 @@ function renderDeveloperApps() {
 
   return `
     <div class="apps-list">
-      ${myApps.map(app => renderDeveloperAppRow(app)).join('')}
+      ${apps.map(app => renderAppRow(app)).join('')}
     </div>
   `;
 }
 
-function renderDeveloperAppRow(app) {
-  const status = app.status || 'pending';
-  const statusColors = {
-    pending: '#ff9800',
-    approved: '#4caf50',
-    rejected: '#f44336'
-  };
-  const statusLabels = {
-    pending: 'En attente',
-    approved: 'Publié',
-    rejected: 'Rejeté'
-  };
-
+function renderAppRow(app) {
   return `
     <div class="app-row" style="cursor: default;">
-      <div class="app-row-icon" style="background: var(--bg-tertiary);">
-        ${icons.apps}
+      <div class="app-row-icon" style="background: var(--bg-tertiary); overflow: hidden;">
+        ${app.icon ? `<img src="${app.icon}" alt="" style="width: 100%; height: 100%; object-fit: cover;">` : icons.apps}
       </div>
       <div class="app-row-info">
         <h3 class="app-row-name">${escapeHtml(app.name)}</h3>
         <div class="app-row-meta">
-          <span class="type-badge-small">${(app.type || 'APK').toUpperCase()}</span>
-          <span style="font-size: 11px; color: ${statusColors[status]};">${statusLabels[status]}</span>
-          <span class="download-small">${app.downloads || 0} téléchargements</span>
+          <span style="font-size: 11px; color: var(--text-muted);">${escapeHtml(app.developer || 'Inconnu')}</span>
+          <span class="type-badge-small">APK</span>
+          <span class="download-small">${app.downloads || 0} DL</span>
         </div>
       </div>
       <div class="app-row-right" style="flex-direction: row; gap: 8px;">
-        <button class="btn-icon" onclick="window.editApp('${app.id}')" title="Modifier">
-          ${icons.edit}
-        </button>
-        <button class="btn-icon" onclick="window.deleteAppConfirm('${app.id}')" title="Supprimer" style="color: #f44336;">
+        <button class="btn-icon" onclick="window.deleteAppConfirm(${app.id})" title="Supprimer" style="color: #f44336;">
           ${icons.trash}
         </button>
       </div>
@@ -149,103 +196,22 @@ function renderDeveloperAppRow(app) {
   `;
 }
 
-function renderDeveloperLanding() {
+function renderLoginPrompt() {
   return `
-    <div class="dev-landing">
-      <!-- Upload Zone (guest) -->
-      ${renderUploadZone()}
-
-      <div style="text-align: center; margin-top: 24px;">
-        <p style="color: var(--text-muted); margin-bottom: 16px;">
-          Connectez-vous pour publier vos applications
+    <div class="dev-landing" style="text-align: center; padding: 48px 20px;">
+      <div style="max-width: 400px; margin: 0 auto;">
+        <div style="color: var(--accent); margin-bottom: 24px;">
+          ${icons.lock}
+        </div>
+        <h2 style="font-size: 24px; margin-bottom: 12px;">Accès restreint</h2>
+        <p style="color: var(--text-muted); margin-bottom: 24px;">
+          Connectez-vous pour accéder à l'espace d'administration
         </p>
-        <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
-          <a href="/login" data-link class="btn-secondary">
-            ${icons.user}
-            <span>Connexion</span>
-          </a>
-          <a href="/register" data-link class="btn-primary">
-            ${icons.plus}
-            <span>Créer un compte</span>
-          </a>
-        </div>
+        <a href="/login" data-link class="btn-primary" style="display: inline-flex;">
+          ${icons.user}
+          <span>Se connecter</span>
+        </a>
       </div>
-
-      <!-- Pricing Section -->
-      <section class="section" style="margin-top: 48px;">
-        <h2 class="section-title" style="justify-content: center; margin-bottom: 24px;">
-          Tarification
-        </h2>
-        ${renderPricingGrid()}
-      </section>
-
-      <!-- Features -->
-      <section class="section" style="margin-top: 48px;">
-        <h2 class="section-title" style="justify-content: center; margin-bottom: 24px;">
-          Pourquoi NexusStore ?
-        </h2>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px;">
-          ${renderFeatureCard(icons.dollar, 'Commission réduite', 'Seulement 15% de commission sur les ventes, bien moins que les stores traditionnels.')}
-          ${renderFeatureCard(icons.chart, 'Analytics avancés', 'Suivez vos téléchargements, revenus et avis en temps réel.')}
-          ${renderFeatureCard(icons.globe, 'Multi-plateforme', 'Publiez des APK, AAB et PWA depuis une seule plateforme.')}
-          ${renderFeatureCard(icons.check, 'Validation rapide', 'Vos apps sont validées sous 24h par notre équipe.')}
-        </div>
-      </section>
-    </div>
-  `;
-}
-
-function renderPricingGrid() {
-  return `
-    <div class="pricing-grid">
-      <div class="pricing-card">
-        <div class="pricing-badge">Gratuit</div>
-        <div class="pricing-price">0€</div>
-        <div class="pricing-period">pour toujours</div>
-        <ul class="pricing-features">
-          <li class="pricing-feature">${icons.check} 3 applications max</li>
-          <li class="pricing-feature">${icons.check} Analytics basiques</li>
-          <li class="pricing-feature">${icons.check} Support email</li>
-          <li class="pricing-feature">${icons.check} 20% commission</li>
-        </ul>
-        <a href="/register" data-link class="btn-secondary" style="width: 100%;">Commencer</a>
-      </div>
-
-      <div class="pricing-card featured">
-        <div class="pricing-badge">Pro</div>
-        <div class="pricing-price">29€</div>
-        <div class="pricing-period">/ mois</div>
-        <ul class="pricing-features">
-          <li class="pricing-feature">${icons.check} Applications illimitées</li>
-          <li class="pricing-feature">${icons.check} Analytics avancés</li>
-          <li class="pricing-feature">${icons.check} Support prioritaire</li>
-          <li class="pricing-feature">${icons.check} 10% commission</li>
-        </ul>
-        <a href="/register" data-link class="btn-primary" style="width: 100%;">Choisir Pro</a>
-      </div>
-
-      <div class="pricing-card">
-        <div class="pricing-badge">Enterprise</div>
-        <div class="pricing-price">Sur mesure</div>
-        <div class="pricing-period">&nbsp;</div>
-        <ul class="pricing-features">
-          <li class="pricing-feature">${icons.check} Volume illimité</li>
-          <li class="pricing-feature">${icons.check} API dédiée</li>
-          <li class="pricing-feature">${icons.check} Account manager</li>
-          <li class="pricing-feature">${icons.check} Commission négociée</li>
-        </ul>
-        <button class="btn-secondary" style="width: 100%;" onclick="window.contactEnterprise()">Contacter</button>
-      </div>
-    </div>
-  `;
-}
-
-function renderFeatureCard(icon, title, description) {
-  return `
-    <div style="padding: 24px; background: var(--bg-secondary); border-radius: var(--radius-md); border: 1px solid var(--border);">
-      <div style="color: var(--accent); margin-bottom: 12px;">${icon}</div>
-      <h3 style="font-size: 16px; margin-bottom: 8px;">${title}</h3>
-      <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5;">${description}</p>
     </div>
   `;
 }
@@ -265,53 +231,124 @@ function escapeHtml(text) {
 }
 
 // Global functions
-window.loadDeveloperApps = function() {
-  import('../api.js').then(api => {
-    api.getDeveloperApps().then(data => {
-      // Update state with developer apps
-      showToast('Applications actualisées', 'success');
-    }).catch(err => {
-      console.error('Error loading apps:', err);
-    });
-  });
-};
+window.handleAddApp = async function(event) {
+  event.preventDefault();
 
-window.editApp = function(appId) {
-  console.log('Edit app:', appId);
-  // TODO: Open edit modal
-};
+  const form = event.target;
+  const submitBtn = document.getElementById('submitBtn');
+  const progressDiv = document.getElementById('uploadProgress');
+  const progressBar = document.getElementById('progressBar');
+  const progressText = document.getElementById('progressText');
 
-window.deleteAppConfirm = function(appId) {
-  if (confirm('Êtes-vous sûr de vouloir supprimer cette application ?')) {
-    import('../api.js').then(api => {
-      api.deleteApp(appId).then(() => {
-        showToast('Application supprimée', 'success');
-        window.renderApp();
-      }).catch(err => {
-        showToast('Erreur lors de la suppression', 'error');
-      });
-    });
-  }
-};
+  const iconFile = document.getElementById('iconFile').files[0];
+  const apkFile = document.getElementById('apkFile').files[0];
 
-window.contactEnterprise = function() {
-  window.location.href = 'mailto:enterprise@nexusstore.com?subject=NexusStore Enterprise';
-};
-
-// File selected callback
-window.onFileSelected = function(file) {
-  if (!state.isAuthenticated) {
-    showToast('Connectez-vous pour uploader une application', 'error');
+  if (!apkFile) {
+    showToast('Veuillez sélectionner un fichier APK', 'error');
     return;
   }
 
-  console.log('File ready for upload:', file.name);
-  // TODO: Open app details form modal
+  // Show progress
+  submitBtn.disabled = true;
+  progressDiv.style.display = 'block';
+  progressBar.style.width = '0%';
+  progressText.textContent = 'Préparation...';
+
+  try {
+    let iconUrl = '';
+    let apkUrl = '';
+
+    // Upload icon if provided
+    if (iconFile) {
+      progressText.textContent = 'Upload de l\'icône...';
+      progressBar.style.width = '20%';
+      iconUrl = await api.uploadImage(iconFile);
+    }
+
+    // Upload APK
+    progressText.textContent = 'Upload de l\'APK...';
+    apkUrl = await api.uploadFile(apkFile, (percent) => {
+      progressBar.style.width = `${20 + percent * 0.7}%`;
+      progressText.textContent = `Upload de l'APK... ${percent}%`;
+    });
+
+    // Create app entry
+    progressText.textContent = 'Enregistrement...';
+    progressBar.style.width = '95%';
+
+    const appData = {
+      name: form.name.value.trim(),
+      developer: form.developer.value.trim() || 'NexusStore',
+      version: form.version.value.trim() || '1.0.0',
+      category: form.category.value,
+      description: form.description.value.trim(),
+      icon: iconUrl,
+      apkUrl: apkUrl,
+      type: 'apk',
+      isHot: form.featured.checked,
+      featured: form.featured.checked
+    };
+
+    await api.createApp(appData);
+
+    progressBar.style.width = '100%';
+    progressText.textContent = 'Terminé !';
+
+    showToast('Application publiée avec succès', 'success');
+
+    // Reset form and refresh
+    form.reset();
+    progressDiv.style.display = 'none';
+
+    // Reload apps
+    const { apps } = await api.getApps();
+    setState({ apps, filteredApps: apps });
+    window.renderApp();
+
+  } catch (error) {
+    console.error('Error adding app:', error);
+    showToast(error.message || 'Erreur lors de la publication', 'error');
+    progressDiv.style.display = 'none';
+  } finally {
+    submitBtn.disabled = false;
+  }
 };
 
-// Initialize upload zone after render
+window.deleteAppConfirm = async function(appId) {
+  if (confirm('Êtes-vous sûr de vouloir supprimer cette application ?')) {
+    try {
+      await api.deleteApp(appId);
+      showToast('Application supprimée', 'success');
+
+      // Reload apps
+      const { apps } = await api.getApps();
+      setState({ apps, filteredApps: apps });
+      window.renderApp();
+    } catch (error) {
+      showToast('Erreur lors de la suppression', 'error');
+    }
+  }
+};
+
+window.refreshApps = async function() {
+  try {
+    const { apps } = await api.getApps();
+    setState({ apps, filteredApps: apps });
+    showToast('Liste actualisée', 'success');
+    window.renderApp();
+  } catch (error) {
+    showToast('Erreur lors de l\'actualisation', 'error');
+  }
+};
+
+window.handleLogout = function() {
+  api.logout();
+  setState({ user: null, isAuthenticated: false });
+  showToast('Déconnexion réussie', 'success');
+  window.navigate('/');
+};
+
+// Initialize
 export function initDeveloperPage() {
-  setTimeout(() => {
-    initUploadZone();
-  }, 100);
+  // Nothing special needed
 }
